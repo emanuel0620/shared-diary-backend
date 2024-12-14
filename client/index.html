@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shared Diary</title>
+  <!-- Add Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GLhlTQ8iT7XzF9J8f++2pJqqu2RkR4zL1lgFfLkN2aYrC0Xw8FAJ4aRmsVxJ7fuX" crossorigin="anonymous">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .form-toggle {
+      text-align: center;
+      margin-top: 1rem;
+    }
+    .diary-entry {
+      border: 1px solid #ccc;
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1 class="text-center mb-4">Shared Diary</h1>
+
+    <!-- Signup Form -->
+    <div id="signup-container">
+      <h3>Sign Up</h3>
+      <form id="signup-form">
+        <div class="mb-3">
+          <input class="form-input form-control" type="text" id="signup-username" placeholder="Enter Username" required>
+        </div>
+        <div class="mb-3">
+          <input class="form-input form-control" type="password" id="signup-password" placeholder="Enter Password" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Sign Up</button>
+      </form>
+      <div class="form-toggle">
+        <button class="btn btn-link" id="show-login">Already have an account? Log in</button>
+      </div>
+    </div>
+
+    <!-- Login Form -->
+    <div id="login-container" style="display:none;">
+      <h3>Login</h3>
+      <form id="login-form">
+        <div class="mb-3">
+          <input class="form-input form-control" type="text" id="username" placeholder="Enter Username" required>
+        </div>
+        <div class="mb-3">
+          <input class="form-input form-control" type="password" id="password" placeholder="Enter Password" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Login</button>
+      </form>
+      <div class="form-toggle">
+        <button class="btn btn-link" id="show-signup">Don't have an account? Sign up</button>
+      </div>
+    </div>
+
+    <!-- Diary Form (visible after login) -->
+    <div id="diary-container" style="display:none;">
+      <form id="diary-form">
+        <div class="mb-3">
+          <input class="form-input form-control" type="text" id="title" placeholder="Enter the title" required>
+        </div>
+        <div class="mb-3">
+          <textarea class="form-input form-control" id="content" rows="5" placeholder="Enter your diary entry" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Add Entry</button>
+      </form>
+
+      <!-- Display the list of diary entries -->
+      <div id="entries"></div>
+    </div>
+  </div>
+
+  <script>
+    // Handle toggle between Signup and Login
+    document.getElementById('show-login').addEventListener('click', () => {
+      document.getElementById('signup-container').style.display = 'none';
+      document.getElementById('login-container').style.display = 'block';
+    });
+
+    document.getElementById('show-signup').addEventListener('click', () => {
+      document.getElementById('login-container').style.display = 'none';
+      document.getElementById('signup-container').style.display = 'block';
+    });
+
+    // Handle signup form submission
+    document.getElementById('signup-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const username = document.getElementById('signup-username').value;
+      const password = document.getElementById('signup-password').value;
+
+      const response = await fetch('http://localhost:5000/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await response.json();
+
+      if (data.message) {
+        alert(data.message);
+        document.getElementById('signup-container').style.display = 'none';
+        document.getElementById('login-container').style.display = 'block';
+      } else {
+        alert('Signup failed: ' + data.message);
+      }
+    });
+
+    // Handle login form submission
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      const response = await fetch('http://localhost:5000/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await response.json();
+
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        document.getElementById('login-container').style.display = 'none';
+        document.getElementById('diary-container').style.display = 'block';
+        fetchEntries();
+      } else {
+        alert('Login failed: ' + data.message);
+      }
+    });
+
+    async function fetchEntries() {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/diary', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      const entries = await response.json();
+      const entriesContainer = document.getElementById('entries');
+      entriesContainer.innerHTML = '';
+      
+      entries.forEach(entry => {
+        const entryDiv = document.createElement('div');
+        entryDiv.classList.add('diary-entry');
+        entryDiv.innerHTML = `
+          <h3>${entry.title}</h3>
+          <p>${entry.content}</p>
+          <small>${new Date(entry.date).toLocaleString()}</small>
+        `;
+        entriesContainer.appendChild(entryDiv);
+      });
+    }
+
+    // Add new diary entry
+    document.getElementById('diary-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const title = document.getElementById('title').value;
+      const content = document.getElementById('content').value;
+      const token = localStorage.getItem('token');
+
+      const response = await fetch('http://localhost:5000/api/diary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ title, content }),
+      });
+
+      document.getElementById('title').value = '';
+      document.getElementById('content').value = '';
+      fetchEntries();
+    });
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js" integrity="sha384-oBqDVmMz4fnFO9gybS4xAZ6Lr13v5n9j9QqfYlg7jIEkh2cdRbm1sPb91B7Ugq9t" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js" integrity="sha384-pzjw8f+ua7Kw1TIq0bZ5E8gf/iY7mZm2N+12z3nxfvtdbcXy3z+7B0t6SHg7V5mf" crossorigin="anonymous"></script>
+</body>
+</html>
